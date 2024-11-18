@@ -1,0 +1,58 @@
+name: Push the Docker image to AWS ECR Repo
+on:
+  push:
+    branches:
+      - stages/test
+  workflow_dispatch:
+    inputs:
+      manual_ref:
+        type: string
+        description: The tag or hash that needs to be deployed
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  Build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:  
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Make envfile
+        uses: SpicyPizza/create-envfile@v2.0
+        with:
+          envkey_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+          directory: .
+          file_name: .env
+          fail_on_empty: false
+          sort_keys: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.STAGING_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        
+
+      - name: Get commit hash
+        id: get-commit-hash
+        run: echo "::set-output name=commit-hash::$(git rev-parse --short HEAD)"
+
+      - name: Build, tag, and push docker image to Amazon ECR 
+        id: build-image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: template-test
+          IMAGE_TAG: ${{ steps.get-commit-hash.outputs.commit-hash }}
+          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        run: |
+          podman build -f Containerfile -t template-test .
+          podman tag template-test:latest 897722699959.dkr.ecr.us-east-1.amazonaws.com/template-test:latest
+          podman push 897722699959.dkr.ecr.us-east-1.amazonaws.com/template-test
