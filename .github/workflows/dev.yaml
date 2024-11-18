@@ -53,7 +53,6 @@ jobs:
           ECR_REPOSITORY: template-dev
           IMAGE_TAG: ${{ steps.get-commit-hash.outputs.commit-hash }}
           DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
-          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         run: |
           podman build -f Containerfile -t template-dev .
           podman tag template-dev:latest 897722699959.dkr.ecr.us-east-1.amazonaws.com/template-dev:latest
